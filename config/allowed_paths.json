@@ -1,0 +1,348 @@
+{
+ "allowed_dirs": [
+  "seed_master_data_and_settings",
+  "BugFix-Approvals",
+  "BugFix-Analytics",
+  "bank-data",
+  "BugFix-HR",
+  "BugFix-Maintenance",
+  "BugFix-Accounting",
+  "BugFix-Custom-Reports",
+  "BugFix-Stock",
+  "BugFix-Purchase",
+  "BugFix-Sales",
+  "BugFix-MRP",
+  "BugFix-Project",
+  "Fix-repair",
+  "studio_usermodel_migration",
+  "BugFix-Studio-Misc",
+  "Fix-Repair-Wizard-Nav",
+  "Jinasena_Local_Purchase",
+  "Jinasena_All",
+  "Jinasena_Masterdata_Reporting"
+ ],
+ "modules": {
+  "seed_master_data_and_settings": {
+   "name": "Jinasena : Masterdata : Setup Data",
+   "version": "17.0.1.0.12",
+   "depends": [
+    "base",
+    "stock",
+    "hr",
+    "mail"
+   ]
+  },
+  "BugFix-Approvals": {
+   "name": "Jinasena : Module : Approvals",
+   "version": "17.0.0.0.11",
+   "depends": [
+    "base_setup",
+    "base_automation",
+    "web_studio",
+    "maintenance",
+    "mrp",
+    "purchase",
+    "sale"
+   ]
+  },
+  "BugFix-Analytics": {
+   "name": "Jinasena : Module : Analytics",
+   "version": "17.0.1.0.14",
+   "depends": [
+    "base_setup",
+    "sale",
+    "sale_stock",
+    "account",
+    "hr",
+    "product"
+   ]
+  },
+  "bank-data": {
+   "name": "Jinasena : SubModule : Payroll : Bank Data",
+   "version": "17.0.1.0.9",
+   "depends": [
+    "account",
+    "hr",
+    "hr_payroll",
+    "base",
+    "base_automation"
+   ]
+  },
+  "BugFix-HR": {
+   "name": "Jinasena : Module : HR",
+   "version": "17.0.0.0.49",
+   "depends": [
+    "base_setup",
+    "hr",
+    "hr_attendance",
+    "hr_contract",
+    "hr_expense",
+    "hr_payroll",
+    "hr_recruitment",
+    "bank-data",
+    "base_automation"
+   ]
+  },
+  "BugFix-Maintenance": {
+   "name": "Jinasena : Module : Maintenance",
+   "version": "17.0.0.0.18",
+   "depends": [
+    "base_setup",
+    "maintenance",
+    "base_automation",
+    "mrp_maintenance"
+   ]
+  },
+  "BugFix-Accounting": {
+   "name": "Jinasena : Module : Accounting",
+   "version": "17.0.0.0.152",
+   "depends": [
+    "base_setup",
+    "account",
+    "account_budget",
+    "account_reports",
+    "mrp",
+    "sale",
+    "crm",
+    "stock",
+    "project",
+    "studio_usermodel_migration",
+    "BugFix-Project",
+    "BugFix-Sales",
+    "bank-data",
+    "seed_master_data_and_settings"
+   ]
+  },
+  "BugFix-Custom-Reports": {
+   "name": "Jinasena : SubModule : Reporting : Custom Reports",
+   "version": "17.0.0.0.20",
+   "depends": [
+    "base_setup",
+    "BugFix-Studio-Misc"
+   ]
+  },
+  "BugFix-Stock": {
+   "name": "Jinasena : Module : Inventory",
+   "version": "17.0.0.0.128",
+   "depends": [
+    "base_setup",
+    "stock",
+    "stock_account",
+    "stock_landed_costs",
+    "helpdesk_stock",
+    "Jinasena_Masterdata_Reporting"
+   ]
+  },
+  "BugFix-Purchase": {
+   "name": "Jinasena : Module : Purchase",
+   "version": "17.0.1.0.199",
+   "depends": [
+    "base_setup",
+    "purchase",
+    "purchase_stock",
+    "purchase_requisition",
+    "account",
+    "BugFix-Accounting"
+   ]
+  },
+  "BugFix-Sales": {
+   "name": "Jinasena : Module : Sales",
+   "version": "17.0.1.0.170",
+   "depends": [
+    "base_setup",
+    "sale",
+    "sale_stock",
+    "industry_fsm_sale",
+    "purchase_requisition",
+    "website_sale",
+    "sale_subscription",
+    "sale_loyalty",
+    "account_followup",
+    "bank-data",
+    "Jinasena_Masterdata_Reporting",
+    "BugFix-Stock",
+    "base_automation",
+    "BugFix-Approvals",
+    "studio_usermodel_migration",
+    "seed_master_data_and_settings"
+   ]
+  },
+  "BugFix-MRP": {
+   "name": "Jinasena : Module : MRP",
+   "version": "17.0.0.0.66",
+   "depends": [
+    "base_setup",
+    "mrp",
+    "mrp_plm",
+    "mrp_workorder",
+    "maintenance",
+    "hr_maintenance",
+    "mrp_maintenance",
+    "purchase_stock",
+    "quality",
+    "quality_mrp",
+    "quality_mrp_workorder",
+    "stock_delivery",
+    "BugFix-Stock",
+    "BugFix-Maintenance",
+    "Jinasena_Masterdata_Reporting"
+   ]
+  },
+  "BugFix-Project": {
+   "name": "Jinasena : Module : Project",
+   "version": "17.0.0.0.65",
+   "depends": [
+    "base_setup",
+    "project",
+    "Jinasena_Masterdata_Reporting"
+   ]
+  },
+  "Fix-repair": {
+   "name": "Jinasena : Module : Repair",
+   "version": "17.0.1.0.377",
+   "depends": [
+    "base_setup",
+    "helpdesk",
+    "helpdesk_fsm",
+    "repair",
+    "sale",
+    "sale_stock",
+    "industry_fsm_sale",
+    "industry_fsm_stock",
+    "industry_fsm_report",
+    "BugFix-Sales",
+    "studio_usermodel_migration"
+   ]
+  },
+  "studio_usermodel_migration": {
+   "name": "Jinasena : Masterdata : User",
+   "version": "17.0.1.0.64",
+   "depends": [
+    "base",
+    "hr_recruitment",
+    "account",
+    "bank-data"
+   ]
+  },
+  "BugFix-Studio-Misc": {
+   "name": "Jinasena : Module : Studio-Misc",
+   "version": "17.0.0.0.127",
+   "depends": [
+    "maintenance",
+    "base_setup",
+    "base_automation",
+    "mail",
+    "hr_expense",
+    "documents_hr_expense",
+    "helpdesk",
+    "purchase_requisition",
+    "mrp_plm",
+    "mrp_landed_costs",
+    "stock_landed_costs",
+    "account_edi",
+    "industry_fsm_sale",
+    "hr_attendance",
+    "project",
+    "crm",
+    "seed_master_data_and_settings",
+    "sale_crm",
+    "sales_team",
+    "calendar",
+    "loyalty",
+    "point_of_sale",
+    "pos_sale",
+    "pos_loyalty",
+    "pos_online_payment",
+    "website",
+    "website_sale",
+    "website_sale_loyalty",
+    "delivery",
+    "stock",
+    "sale",
+    "purchase",
+    "account",
+    "studio_usermodel_migration",
+    "BugFix-Project",
+    "BugFix-Accounting",
+    "BugFix-Stock",
+    "BugFix-MRP",
+    "BugFix-Sales",
+    "BugFix-Purchase"
+   ]
+  },
+  "Fix-Repair-Wizard-Nav": {
+   "name": "Jinasena : SubModule : Repair : Wizard Navigation",
+   "version": "17.0.1.0.95",
+   "depends": [
+    "helpdesk",
+    "helpdesk_fsm",
+    "industry_fsm_sale",
+    "sale",
+    "sale_stock",
+    "account",
+    "Fix-repair"
+   ]
+  },
+  "Jinasena_Local_Purchase": {
+   "name": "Jinasena : SubModule : Purchase : Local Purchase",
+   "version": "17.0.1.0.5",
+   "depends": [
+    "base_setup",
+    "purchase",
+    "BugFix-Purchase"
+   ]
+  },
+  "Jinasena_All": {
+   "name": "Jinasena : Meta : ERP",
+   "version": "17.0.1.0.44",
+   "depends": [
+    "bank-data",
+    "seed_master_data_and_settings",
+    "BugFix-Approvals",
+    "BugFix-Analytics",
+    "BugFix-HR",
+    "BugFix-Maintenance",
+    "BugFix-Accounting",
+    "BugFix-Custom-Reports",
+    "BugFix-Stock",
+    "BugFix-Purchase",
+    "BugFix-Sales",
+    "BugFix-MRP",
+    "BugFix-Project",
+    "BugFix-Studio-Misc",
+    "Fix-repair",
+    "Fix-Repair-Wizard-Nav",
+    "Jinasena_Local_Purchase",
+    "Jinasena_Masterdata_Reporting",
+    "studio_usermodel_migration",
+    "auto_database_backup"
+   ]
+  },
+  "Jinasena_Masterdata_Reporting": {
+   "name": "Jinasena : SubModule : Reporting : Masterdata",
+   "version": "17.0.1.0.7",
+   "depends": [
+    "base_setup",
+    "account",
+    "sale",
+    "stock",
+    "mrp"
+   ]
+  }
+ },
+ "third_party_untouchable": [
+  "auto_database_backup",
+  "bi_view_editor",
+  "bi_warehouse_restrictions",
+  "budget_estimate_run",
+  "dynamic_cheque_print_ee",
+  "employee_loan_payroll_enterprise",
+  "hide_menu_user",
+  "hr_employee_loan",
+  "hr_ot_sheet",
+  "payroll_imports",
+  "res_partner_bank",
+  "stock_no_negative",
+  "test_app"
+ ]
+}
