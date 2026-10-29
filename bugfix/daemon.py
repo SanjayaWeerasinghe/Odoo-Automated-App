@@ -128,7 +128,10 @@ def process(bug, c, cfg):
     with open(STATE / "results.jsonl", "a") as f:
         f.write(json.dumps({"bug": bug.key, "triage": v, "fix": outcome}, default=str) + "\n")
     write_report(c)
-    _note(bug, v["verdict"], v.get("summary", ""), outcome, cfg)
+    summary = v.get("summary", "")
+    if v.get("root_cause") in ("data", "config", "permissions") and v["verdict"] in ("staging_regression", "staging_bug_no_reference", "reproduces_on_both"):
+        summary = f"DATA/CONFIG gap, not a code fix ({v['root_cause']}): {summary}"
+    _note(bug, v["verdict"], summary, outcome, cfg)
     return outcome
 
 

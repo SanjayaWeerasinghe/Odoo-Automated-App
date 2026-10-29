@@ -110,7 +110,7 @@ UPDATES = {
  "F16": ("Fixed (measured): RPC calls reuse the known user id (login-log rows 131 before and after 3 calls). The browser reuses a saved session (1 login the first time, 0 after). Residual: one login when the session expires.", None),
  "F17": ("OPEN (partly mitigated): deny rules corrected (two-slash form) and tested; Claude was refused when told to read .env and the saved session file. The owner must still rotate the GitHub token and Odoo password; I cannot do that.", " Also found: my earlier single-slash deny rules never matched, so they did not protect .env until now."),
  "F19": ("NOT DONE: the system blocked my cron @reboot entry as unauthorized persistence and I did not try to bypass it. Needs owner approval: add the crontab line or run pm2 startup with sudo.", None),
- "F20": ("OPEN: the daemon was restarted with all fixes and is working through the queue; the first fix reaching the push stage will prove the path.", None),
+ "F20": ("Fixed (proven): the push, Odoo.sh rebuild wait (about 2.5 min), post-deploy verification and automatic revert all ran for real: 5 fixes verified, 2 reverted, 1 no change.", None),
 }
 FAILURES = [tuple((u[0] or f[6]) if i == 6 else (f[i] + (u[1] or "") if i == 4 else f[i]) for i in range(7))
             if (u := UPDATES.get(f[0])) else f for f in FAILURES]
@@ -152,7 +152,7 @@ def build(path):
     s.append(Paragraph("Summary", h2))
     s.append(Paragraph(f"{len(FAILURES)} items. Fixed: {status['Fixed']}. Open or not done: {status['Open / not done']}. Accepted / no action: {status['Accepted / no action']}.", body))
     s.append(Paragraph("<b>Still open:</b> (1) F17 the owner must rotate the exposed GitHub token and Odoo password; (2) F19 reboot persistence needs the owner's approval (crontab line or pm2 startup with sudo); "
-                       "(3) F20 the push, deploy-wait and revert path is still unproven until the first fix is pushed; (4) F15 no local Odoo tests are possible, only lint plus post-deploy checks.", body))
+                       "(3) F25 a person should review the bot's accounting-related commit be0ff596 and the other autofix commits; (4) F21/F22 the data and configuration gaps behind the two reverts must be fixed by a human (load the structure lines on staging, set the JAM default receivable account); (5) F15 no local Odoo tests are possible, only lint plus post-deploy checks.", body))
 
     s.append(Paragraph("Failure log", h2))
     rows = [[P(x, head) for x in ("ID", "Area", "Stage", "What failed", "Why it failed", "Impact", "Status")]]
@@ -184,7 +184,7 @@ def build(path):
 
     s.append(Paragraph("Notes on interpretation", h2))
     for line in ("A verdict of verified_fixed means the agent could not reproduce the reported problem on staging; the bot writes a one-line note into the Retest Status column of that row (F07).",
-                 "Failures F01-F06 and F10 happened before the bot existed (planning and environment setup). F08, F09, F11 and F12 are bugs in code I wrote and have been fixed.",
+                 "Failures F21-F22 were wrong fixes (reverted), F23-F24 were my own mistakes. Failures F01-F06 and F10 happened before the bot existed (planning and environment setup). F08, F09, F11 and F12 are bugs in code I wrote and have been fixed.",
                  "Limitations F14-F16 are not crashes; they are places where the bot does less than the original brief asked, so they are listed as failures to be honest about scope."):
         s.append(Paragraph("- " + line, body))
     doc.build(s)

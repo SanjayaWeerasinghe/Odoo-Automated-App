@@ -40,8 +40,11 @@ def test_path_guard():
 def test_triage_parse_and_prompt():
     from bugfix.triage import parse_verdict, build_prompt
     from bugfix.intake.sheet_reader import Bug
-    ok = 'blah\n```json\n{"verdict": "staging_regression", "confidence": 0.8}\n```'
+    ok = 'blah\n```json\n{"verdict": "staging_regression", "confidence": 0.8, "root_cause": "code"}\n```'
     assert parse_verdict(ok)["needs_fix"] is True
+    data_gap = ok.replace('"code"', '"data"')
+    assert parse_verdict(data_gap)["needs_fix"] is False        # missing master data is never patched in code
+    assert parse_verdict(ok.replace(', "root_cause": "code"', ""))["needs_fix"] is False
     assert parse_verdict('```json\n{"verdict": "verified_fixed"}\n```')["needs_fix"] is False
     for bad in ("no block", '```json\n{"verdict": "banana"}\n```'):
         with pytest.raises(ValueError):
@@ -81,3 +84,13 @@ def test_sheet_writer_rules():
     n = note_for("verified_fixed", "On staging the field exists.\nSecond line")
     assert n.startswith("BOT ") and "\n" not in n and not n.startswith(("=", "+", "-", "@"))
     assert "FIXED" in note_for("x", "", {"outcome": "fixed_verified", "sha": "abcdef123456", "commit": "msg"})
+
+
+def test_no_hardcoded_install_path_and_deny_rules():
+    from pathlib import Path
+    from bugfix import triage
+    root = Path(triage.__file__).resolve().parent
+    assert "/home/odoo/bugfix-agent/" not in (root / "triage.py").read_text()
+    rules = triage.secret_deny_rules()
+    assert rules and all(r.startswith("Read(//") for r in rules)
+    assert any(r.endswith(".env)") for r in rules)

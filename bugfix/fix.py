@@ -11,6 +11,7 @@ from bugfix import git_ops
 from bugfix.agents.claude_runner import run_with_limit_retry
 from bugfix.git_guard import assert_diff_allowed, load_allowed
 from bugfix.odoo.rpc import StagingRPC
+from bugfix.triage import secret_deny_rules
 
 ROOT = git_ops.ROOT
 MAX_FILES, MAX_LINES = 15, 500
@@ -31,6 +32,8 @@ FIX_PROMPT = """You are fixing ONE bug in custom Odoo 17 Enterprise modules. The
 - You cannot run Odoo locally (Enterprise is not available). Reason carefully, keep Python syntax and XML valid;
   syntax is checked after you finish. The fix is then deployed to staging and re-tested automatically.
 - If you conclude this is NOT a code bug (data/config/permissions) or needs a business decision, change nothing and say so.
+- A change that only adds an error message or guard, without making the reported behaviour actually work, is NOT a fix:
+  change nothing. Past attempts of that kind failed verification and were reverted.
 
 Finish with ONE fenced ```json block: {{"changed": true|false, "modules": ["dir"], "commit_title": "short imperative summary", "explanation": "what and why", "risk": "low|medium|high"}}
 """
@@ -149,7 +152,7 @@ def attempt_fix(bug, triage_payload, build_prompt_report, cfg, verify_fn, on_pus
             permission_mode="acceptEdits",  # edits auto-approved inside the worktree only; assert_diff_allowed is the hard guard
             allowed_tools=["Read", "Grep", "Glob", "Edit", "Write", "Bash(git diff:*)", "Bash(git status:*)"],
             disallowed_tools=["NotebookEdit", "WebFetch", "WebSearch", "Bash(git push:*)", "Bash(git commit:*)",
-                              f"Read(/{ROOT}/.env)", f"Read(/{ROOT}/state/*_session.json)"])
+                              *secret_deny_rules()])
         m = re.findall(r"```json\s*(\{.*?\})\s*```", data.get("result", ""), re.S)
         summary = json.loads(m[-1]) if m else {}
         files = changed_files(wt)

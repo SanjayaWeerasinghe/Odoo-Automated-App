@@ -48,9 +48,9 @@ Row status in the sheet: {status_note}
   records, field/view definitions and screens.
 
 ## Tools (use via Bash, exactly this form)
-- RPC: /home/odoo/bugfix-agent/bin/odoo-rpc --env stg|kg --model res.partner --method search_read --args '[[["id",">",0]]]' --kwargs '{{"fields":["name"],"limit":3}}'
+- RPC: {bot}/bin/odoo-rpc --env stg|kg --model res.partner --method search_read --args '[[["id",">",0]]]' --kwargs '{{"fields":["name"],"limit":3}}'
   Prefer RPC for data/logic bugs (fields_get, search_read, create/write/unlink on staging, calling methods).
-- Browser: /home/odoo/bugfix-agent/bin/odoo-browse --env stg|kg --steps FILE.json  (FILE.json is a list of steps written under /tmp or the cwd)
+- Browser: {bot}/bin/odoo-browse --env stg|kg --steps FILE.json  (FILE.json is a list of steps written under /tmp or the cwd)
   actions: goto{{path}}, click{{selector}}, fill{{selector,value}}, select{{selector,value}}, press{{key}}, wait{{selector|ms}},
   screenshot{{name}} (you can Read the PNG path it returns), text{{selector}}, exists{{selector}}.
   It reports dialogs ("Oh snap" errors), console errors and RPC errors. Odoo 17 URLs look like /web#action=...&model=...&view_type=form.
@@ -71,7 +71,11 @@ staging_bug_no_reference (broken on staging, KG cannot be compared) | needs_huma
 Finish with ONE fenced ```json block and nothing after it:
 {{"verdict": "...", "confidence": 0.0-1.0, "summary": "2-3 sentences", "repro_steps": ["..."],
   "staging_result": "...", "kg_result": "...", "suspected_files": ["path:line"], "cleanup_done": true,
-  "notes_for_fixer": "what a developer needs to know, or empty"}}
+  "root_cause": "code|data|config|permissions|unclear", "notes_for_fixer": "what a developer needs to know, or empty"}}
+
+root_cause: say "code" ONLY if changing the module code would make the reported behaviour work. If staging is missing
+master data, records, company defaults, settings or access rights that KG has (or the code is fine but the inputs are
+absent), say data/config/permissions. A code change that merely adds an error message does not fix a data gap.
 """
 
 
@@ -87,9 +91,21 @@ def already_done(c, bug):
     return c.execute("SELECT 1 FROM triage WHERE key=? AND fingerprint=?", (bug.key, bug.fingerprint)).fetchone() is not None
 
 
+def secret_deny_rules():
+    """Claude Code deny rules (absolute paths need the double slash) for credentials, by real and linked path."""
+    out = []
+    for base in {ROOT, ROOT.resolve()}:
+        for rel in (".env", "state/google-sa.json", "state/*_session.json"):
+            out.append(f"Read(/{base}/{rel})")
+    out.append(f"Read(/{(ROOT / '.env').resolve()})")
+    return sorted(set(out))
+
+
 def is_fix_candidate(v):
-    """Broken on staging with a located cause. reproduces_on_both counts when the code visibly intends the
-    behaviour the tester expects (owner decision: don't wait for a human to bless the fix)."""
+    """Broken on staging with a located cause that is in the CODE. A data/config/permission gap is never patched.
+    reproduces_on_both counts when the code visibly intends the behaviour the tester expects (owner decision)."""
+    if v.get("root_cause") != "code":
+        return False
     if v.get("verdict") in FIX_CANDIDATES:
         return True
     return v.get("verdict") == "reproduces_on_both" and bool(v.get("suspected_files")) and (v.get("confidence") or 0) >= 0.7
@@ -103,7 +119,7 @@ def build_prompt(bug, extra_note=None):
     note = {"new": "new, not yet handled", "retry": "tester says it is STILL BROKEN (Need Correction)",
             "recheck": f"marked '{bug.fields.get('status')}' by the team: verify whether it is really fixed on staging now"}[bug.action]
     hints = ", ".join(TAB_HINTS.get(bug.tab, [])) or "see the directory list"
-    p = PROMPT.format(key=bug.key, report=report, status_note=note, hints=hints)
+    p = PROMPT.format(key=bug.key, report=report, status_note=note, hints=hints, bot=ROOT)
     return p + (f"\n## Extra instruction\n{extra_note}\n" if extra_note else "")
 
 
@@ -121,10 +137,10 @@ def parse_verdict(text):
 def triage_one(bug, extra_note=None, max_turns=40, timeout=1500):
     data = run_with_limit_retry(
         build_prompt(bug, extra_note), cwd=str(WORKSPACE), max_turns=max_turns, timeout=timeout,
-        allowed_tools=["Read", "Grep", "Glob", "Bash(/home/odoo/bugfix-agent/bin/odoo-rpc:*)",
-                       "Bash(/home/odoo/bugfix-agent/bin/odoo-browse:*)", "Write(/tmp/**)"],
-        disallowed_tools=["Edit", "NotebookEdit", "WebFetch", "WebSearch", "Read(//home/odoo/bugfix-agent/.env)",
-                          "Read(//home/odoo/bugfix-agent/state/google-sa.json)", "Read(//home/odoo/bugfix-agent/state/*_session.json)", "Bash(git push:*)", "Bash(cat:*.env*)"])
+        allowed_tools=["Read", "Grep", "Glob", f"Bash({ROOT}/bin/odoo-rpc:*)",
+                       f"Bash({ROOT}/bin/odoo-browse:*)", "Write(/tmp/**)"],
+        disallowed_tools=["Edit", "NotebookEdit", "WebFetch", "WebSearch", *secret_deny_rules(),
+                          "Bash(git push:*)", "Bash(cat:*.env*)"])
     verdict = parse_verdict(data.get("result", ""))
     verdict["_cost_usd"] = data.get("total_cost_usd")
     verdict["_turns"] = data.get("num_turns")
