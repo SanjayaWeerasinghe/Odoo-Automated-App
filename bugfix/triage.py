@@ -94,9 +94,10 @@ def already_done(c, bug):
 def secret_deny_rules():
     """Claude Code deny rules (absolute paths need the double slash) for credentials, by real and linked path."""
     out = []
-    for base in {ROOT, ROOT.resolve()}:
+    for base in {ROOT, ROOT.resolve(), (ROOT / "state").resolve().parent}:   # state/.env may be links to a data dir
         for rel in (".env", "state/google-sa.json", "state/*_session.json"):
             out.append(f"Read(/{base}/{rel})")
+    out.append(f"Read(/{(ROOT / 'state').resolve()}/*_session.json)")
     out.append(f"Read(/{(ROOT / '.env').resolve()})")
     return sorted(set(out))
 
