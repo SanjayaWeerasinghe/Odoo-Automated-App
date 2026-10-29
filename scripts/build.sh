@@ -8,7 +8,7 @@ DATA="${BUGFIX_DATA:-$HOME/bugfix-data}"
 rm -rf "$OUT.new" && mkdir -p "$OUT.new" "$DATA"
 cp -r "$SRC/bugfix" "$SRC/bin" "$SRC/config" "$OUT.new/"
 find "$OUT.new" -name __pycache__ -prune -exec rm -rf {} +
-"$SRC/.venv/bin/python" -m compileall -q -b "$OUT.new/bugfix"
+"$DATA/.venv/bin/python" -m compileall -q -b "$OUT.new/bugfix"
 find "$OUT.new/bugfix" -name '*.py' -delete
 for d in state workspaces reports; do mkdir -p "$DATA/$d"; ln -sfn "$DATA/$d" "$OUT.new/$d"; done
 ln -sfn "$DATA/.env" "$OUT.new/.env"; ln -sfn "$DATA/.venv" "$OUT.new/.venv"
