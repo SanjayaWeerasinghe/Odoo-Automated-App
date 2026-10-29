@@ -14,7 +14,16 @@ READ_METHODS = frozenset({
     "fields_get", "name_search", "default_get", "search_fetch", "fetch",
     "web_search_read", "web_read", "web_read_group", "check_access_rights",
     "check_access_rule", "name_get",
+    "get_view", "get_views", "load_views",   # view definitions: read-only
 })
+
+# Extra methods the web client calls just to render screens; none of them persist data.
+BROWSER_READ_METHODS = READ_METHODS | frozenset({
+    "get_views", "load_views", "get_view", "onchange", "web_name_search", "read_progress_bar",
+    "get_formview_action", "get_formview_id", "has_group", "load_menus",
+})
+# Bus/websocket/presence traffic writes presence rows; never allow it on KG, any method.
+BLOCKED_PATH_PARTS = ("websocket", "/bus/", "/longpolling", "/mail/data", "/web/session/destroy")
 
 # Browser POST endpoints that are safe on KG (anything else non-GET is blocked).
 BROWSER_POST_PREFIXES = (
@@ -39,6 +48,8 @@ def method_allowed(method: str) -> bool:
 def kg_request_allowed(http_method: str, url: str, post_data: str | None):
     """Decide whether a browser request to KG may proceed -> (ok, reason)."""
     path = urlparse(url).path
+    if any(part in path for part in BLOCKED_PATH_PARTS):
+        return False, f"bus/presence endpoint blocked: {path}"
     if http_method.upper() in ("GET", "HEAD", "OPTIONS"):
         return True, "read"
     m = CALL_KW_RE.match(path)
@@ -49,7 +60,7 @@ def kg_request_allowed(http_method: str, url: str, post_data: str | None):
                 method = (json.loads(post_data).get("params") or {}).get("method")
             except (ValueError, AttributeError):
                 method = None
-        if method and method_allowed(method):
+        if method and method in BROWSER_READ_METHODS:
             return True, f"call_kw {method}"
         return False, f"call_kw method not allowed: {method!r}"
     if any(path.startswith(p) for p in BROWSER_POST_PREFIXES):
@@ -58,11 +69,13 @@ def kg_request_allowed(http_method: str, url: str, post_data: str | None):
 
 
 class KGReadOnly:
-    def __init__(self, url: str, db: str, login: str, secret: str, timeout: int = 60):
+    def __init__(self, url: str, db: str, login: str, secret: str, timeout: int = 60, uid: int | None = None):
         self._url = url.rstrip("/")
         self._db, self._login, self._secret = db, login, secret
         self._timeout = timeout
-        self._uid = None
+        # A known uid lets execute_kw skip common.authenticate, which writes a login-log row on every call.
+        self._uid = uid
+        self._uid_preset = uid is not None
 
     def _rpc(self, service: str, method: str, *args):
         payload = {"jsonrpc": "2.0", "method": "call", "id": 1,
@@ -87,8 +100,15 @@ class KGReadOnly:
     def execute_kw(self, model: str, method: str, args=None, kwargs=None):
         if not method_allowed(method):
             raise KGWriteRefused(f"KG is read-only; refused {model}.{method}")
-        return self._rpc("object", "execute_kw", self._db, self._auth(), self._secret,
-                         model, method, args or [], kwargs or {})
+        try:
+            return self._rpc("object", "execute_kw", self._db, self._auth(), self._secret,
+                             model, method, args or [], kwargs or {})
+        except RuntimeError as e:
+            if self._uid_preset and "denied" in str(e).lower():  # stale uid: authenticate once and retry
+                self._uid, self._uid_preset = None, False
+                return self._rpc("object", "execute_kw", self._db, self._auth(), self._secret,
+                                 model, method, args or [], kwargs or {})
+            raise
 
     # Convenience read helpers
     def search_read(self, model, domain=None, fields=None, limit=80, **kw):

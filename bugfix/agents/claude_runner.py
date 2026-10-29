@@ -32,16 +32,19 @@ def _wait_from(text: str) -> int:
 
 def run_claude(prompt: str, cwd: str, *, model: str | None = None, max_turns: int = 30,
                allowed_tools: list[str] | None = None, disallowed_tools: list[str] | None = None,
-               timeout: int = 1800, extra_env: dict | None = None) -> dict:
+               timeout: int = 1800, extra_env: dict | None = None, permission_mode: str | None = None) -> dict:
     assert_subscription_billing()
     cmd = ["claude", "-p", prompt, "--output-format", "json", "--max-turns", str(max_turns)]
     if model:
         cmd += ["--model", model]
+    if permission_mode:
+        cmd += ["--permission-mode", permission_mode]
     if allowed_tools:
         cmd += ["--allowedTools", ",".join(allowed_tools)]
     if disallowed_tools:
         cmd += ["--disallowedTools", ",".join(disallowed_tools)]
-    env = {k: v for k, v in os.environ.items() if k not in BILLING_VARS}
+    env = {k: v for k, v in os.environ.items()
+           if k not in BILLING_VARS and not (k.startswith("CLAUDE_CODE_") and k != "CLAUDE_CODE_OAUTH_TOKEN")}
     env.update(extra_env or {})
     p = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True, timeout=timeout)
     out = (p.stdout or "") + (p.stderr or "")
