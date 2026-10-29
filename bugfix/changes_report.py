@@ -1,4 +1,4 @@
-"""Generates reports/failure_report.pdf: every failure in the bug-bot project, why it happened, and its status.
+"""Generates reports/changes_report.pdf: every failure in the bug-bot project, why it happened, and its status.
 Historical entries are curated below; the live section is read from state/bugfix.db."""
 import json
 import sqlite3
@@ -142,9 +142,9 @@ def build(path):
 
     tri, fx = live_data()
     doc = SimpleDocTemplate(str(path), pagesize=landscape(letter), leftMargin=0.45 * inch, rightMargin=0.45 * inch,
-                            topMargin=0.5 * inch, bottomMargin=0.5 * inch, title="Bug Bot - Failure Report", author="bug bot project")
+                            topMargin=0.5 * inch, bottomMargin=0.5 * inch, title="Bug Bot - Changes Report", author="bug bot project")
     s = []
-    s += [Paragraph("Bug Bot: Failure Report", h1),
+    s += [Paragraph("Bug Bot: Changes Report", h1),
           Paragraph(f"Generated {time.strftime('%Y-%m-%d %H:%M')}. Covers every failure, limitation and shortfall in this project from planning to the running daemon: what failed, why, and whether it is fixed.", body),
           Spacer(1, 6)]
 
@@ -154,7 +154,7 @@ def build(path):
     s.append(Paragraph("<b>Still open:</b> (1) F17 the owner must rotate the exposed GitHub token and Odoo password; (2) F19 reboot persistence needs the owner's approval (crontab line or pm2 startup with sudo); "
                        "(3) F25 a person should review the bot's accounting-related commit be0ff596 and the other autofix commits; (4) F21/F22 the data and configuration gaps behind the two reverts must be fixed by a human (load the structure lines on staging, set the JAM default receivable account); (5) F15 no local Odoo tests are possible, only lint plus post-deploy checks.", body))
 
-    s.append(Paragraph("Failure log", h2))
+    s.append(Paragraph("Change and failure log", h2))
     rows = [[P(x, head) for x in ("ID", "Area", "Stage", "What failed", "Why it failed", "Impact", "Status")]]
     for f in FAILURES:
         rows.append([P(f[0]), P(f[1]), P(f[2]), P(f[3]), P(f[4]), P(f[5]), P(f[6])])
@@ -191,7 +191,7 @@ def build(path):
 
 
 if __name__ == "__main__":
-    out = ROOT / "reports" / "failure_report.pdf"
+    out = ROOT / "reports" / "changes_report.pdf"
     out.parent.mkdir(exist_ok=True)
     build(out)
     print(out)

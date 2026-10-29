@@ -30,7 +30,7 @@ bugfix/
   fix.py             fix prompt, static checks, deploy wait, verify/revert
   git_ops.py         worktrees, commit, fast-forward push, revert (token passed per command, never stored)
   git_guard.py       path allowlist check
-  failure_report.py  builds reports/failure_report.pdf (every failure and why)
+  changes_report.py  builds reports/changes_report.pdf (every failure and why)
   intake/            sheet_reader.py (public xlsx export), sheet_writer.py (anonymous cell editor, "Retest Status" column only)
   odoo/              kg_readonly.py, rpc.py (staging), playwright_runner.py
   tools/             CLIs Claude calls: bin/odoo-rpc, bin/odoo-browse (+ audit log)
@@ -63,7 +63,7 @@ Bytecode is not protection against decompiling; it only avoids leaving plain sou
 - Progress: `pm2 logs bugfix-daemon`, `state/daemon.log`, `state/REPORT.md`, `state/results.jsonl`, sqlite `state/bugfix.db`.
 - Stop: `touch state/STOP` (remove to resume). Reboot persistence needs `pm2 startup` (sudo) or an `@reboot pm2 resurrect` cron entry.
 - Restart safe: a fix pushed but not yet verified is stored as `pending_verify` and finished on startup.
-- Failure document: `.venv/bin/python -m bugfix.failure_report` writes `reports/failure_report.pdf`.
+- Changes report (changes, failures and why): `.venv/bin/python -m bugfix.changes_report` writes `reports/changes_report.pdf`.
 
 ## Known limits
 - No local Odoo Enterprise, so fixes are checked by lint and by post-deploy re-test on staging, not by unit tests.
