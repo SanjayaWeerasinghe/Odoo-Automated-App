@@ -2,10 +2,9 @@
 usage: odoo-rpc --env stg|kg --model M --method search_read --args '[[]]' --kwargs '{"limit":5}'"""
 import argparse, json
 
-from dotenv import dotenv_values
-
 from bugfix.odoo.kg_readonly import KGReadOnly, KGWriteRefused
 from bugfix.odoo.rpc import StagingRPC
+from bugfix import envcfg
 from bugfix.tools import audit
 
 ROOT = audit.ROOT
@@ -21,7 +20,7 @@ def main():
     ap.add_argument("--args", default="[]")
     ap.add_argument("--kwargs", default="{}")
     a = ap.parse_args()
-    e = dotenv_values(ROOT / ".env")
+    e = envcfg.load()
     args, kwargs = json.loads(a.args), json.loads(a.kwargs)
     audit.log(tool="rpc", env=a.env, model=a.model, method=a.method, args=args, kwargs=kwargs)
     try:

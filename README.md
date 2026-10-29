@@ -1,73 +1,53 @@
-# Odoo-Automated-App: autonomous Odoo bug-fixing bot
+# Odoo-Automated-App: scheduled Odoo bug-fixing bot (Claude cloud routine)
 
-A daemon that runs unattended, driven by Claude (headless Claude Code CLI on a Team-plan seat, no API billing).
+A scheduled Claude Code routine (runs in Claude's cloud sandbox, no server of ours) that reads bug reports from a Google Sheet,
+reproduces them on an Odoo **staging** env, compares with a **known-good (KG)** env (read-only), and, for genuine code bugs,
+asks the owner what to do before changing anything.
 
 ```
-Google Sheet (bug rows)
-   -> triage: reproduce on STAGING, compare with KNOWN-GOOD (read-only)      [bugfix/triage.py]
-   -> verdict: verified_fixed | not_reproducible | reproduces_on_both | staging_regression | ...
-   -> fix (only genuine staging bugs): edit custom modules, push to JinStage  [bugfix/fix.py]
-   -> wait for Odoo.sh redeploy, re-verify on staging, revert the commit if it fails
-   -> write a one-line "BOT ..." note back to the sheet + state/REPORT.md
+sheet row -> triage (staging vs KG)  ->  code bug?  -> PLAN issue on GitHub  --owner replies "approve"-->  edit in worktree
+          -> botctl check -> PULL REQUEST  --owner merges (approval)-->  Odoo.sh deploys  -> next run verifies / opens revert PR
 ```
 
-## Hard rules enforced in code (not just prompts)
+## Two human gates, nothing deploys on its own
+1. **Plan**: the bot opens a `bot-plan` issue (evidence, files, proposed change, risk). It touches no code. The owner comments
+   `approve` (optionally with instructions), `decline`, or other instructions. Only comments by `GIT_APPROVERS` count.
+2. **Pull request**: after approval the bot edits the code and opens a PR into `Upgrade_Testing`. It never merges or pushes to that
+   branch (`push_branch` refuses it). Merging the PR is the owner's approval and starts the deploy.
+Recommended GitHub setting: protect `Upgrade_Testing` (require a pull request and the owner's review) so even the token cannot bypass this.
+
+## Other rules enforced in code
 | Rule | Where |
 |---|---|
-| **Known-Good Odoo is never written.** RPC allowlist of read methods; browser requests that are not reads are aborted; bus/websocket/presence blocked; login happens once and the session is reused (no repeated login-log rows). | `bugfix/odoo/kg_readonly.py`, `playwright_runner.py` |
-| **Only the 20 custom module folders may change.** The post-run `git diff` is checked against `config/allowed_paths.json`; third-party folders are untouchable. | `bugfix/git_guard.py` |
-| **Staging config is protected.** Writes to `ir.*`, `res.users`, `res.company` and similar are refused; test records must be cleaned up. | `bugfix/tools/rpc.py` |
-| **Team-plan billing only.** Refuses to start if `ANTHROPIC_API_KEY` (or Bedrock/Vertex vars) is set; sleeps through usage-limit windows. | `bugfix/agents/claude_runner.py` |
-| **Fixes are small and safe.** Max 15 files / 500 lines, manifest version bump required, Python AST / XML / pyflakes checks, fast-forward-only push (never force), failed verification triggers an automatic revert commit. | `bugfix/fix.py`, `bugfix/git_ops.py` |
-| **Circuit breaker + kill switch.** 3 bad outcomes in a row, or a `state/STOP` file, halts the daemon. | `bugfix/daemon.py` |
-| **Secrets stay out of Claude's reach.** Credentials live in `.env`; Claude runs have deny rules for `.env` and saved sessions; every tool call is logged to `state/audit.jsonl`. | `bugfix/triage.py` |
+| KG is never written: RPC read allowlist, browser writes aborted, bus/websocket blocked, session reused | `bugfix/odoo/kg_readonly.py`, `playwright_runner.py` |
+| Only the 20 custom module folders may change (diff checked against `config/allowed_paths.json`) | `bugfix/git_guard.py`, `bugfix/checks.py` |
+| Staging config is protected (`ir.*`, `res.users`, `res.company`...) | `bugfix/tools/rpc.py` |
+| Limits: 15 files / 500 lines, manifest version bump, AST/XML/pyflakes checks | `bugfix/checks.py` |
+| Data/config gaps are never patched in code (`root_cause` must be `code`) | `routine/PROMPT.md` |
+| Memory is the sheet: a `BOT ... [fp:<hash>]` note per row; the row is skipped while the hash matches the report text | `bin/botctl queue` |
 
 ## Layout
 ```
-bugfix/
-  daemon.py          main loop: poll sheet, consensus triage, fix, sheet note, resume pending verifications
-  triage.py          triage prompt, verdict parsing, sqlite results (2-of-3 consensus lives in daemon)
-  fix.py             fix prompt, static checks, deploy wait, verify/revert
-  git_ops.py         worktrees, commit, fast-forward push, revert (token passed per command, never stored)
-  git_guard.py       path allowlist check
-  changes_report.py  builds reports/changes_report.pdf (every failure and why)
-  intake/            sheet_reader.py (public xlsx export), sheet_writer.py (anonymous cell editor, "Retest Status" column only)
-  odoo/              kg_readonly.py, rpc.py (staging), playwright_runner.py
-  tools/             CLIs Claude calls: bin/odoo-rpc, bin/odoo-browse (+ audit log)
-  agents/            claude_runner.py (headless Claude Code)
-config/allowed_paths.json   the 20 editable module dirs and their manifests
-scripts/build.sh            builds the source-free runtime copy
-tests/                      guard tests (KG read-only, path guard, parsing, lint)
+routine/PROMPT.md       the instructions the scheduled agent follows (versioned here)
+bin/botctl              queue, note, clone, worktree, check, plan, plans, propose, prs, wait-deploy, comment-pr, propose-revert
+bin/odoo-rpc, odoo-browse   Odoo tools (staging read/write guarded, KG read-only)
+bugfix/                 odoo/ (RPC, Playwright), intake/ (sheet read/write), checks.py, git_ops.py, git_guard.py, tools/
+config/allowed_paths.json   the editable module folders
+tests/                  guard tests
 ```
 
-## Sheet statuses
-blank = new, `Need Correction` = retry, `Correction Done` / `Completed - New` = re-check, `Completed` = skipped.
-The bot only writes to the "Retest Status" column, and only into empty cells or cells that already start with `BOT`.
-
-## Setup
-1. Python 3.12: `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/playwright install chromium`
-2. `claude` CLI logged in on the Team seat (`claude /login`). Do **not** export `ANTHROPIC_API_KEY`.
-3. `cp .env.example .env && chmod 600 .env`, then fill in: sheet id, staging and KG URL/DB/login (and `KG_UID`/`STG_UID` to avoid login-log writes), `GIT_TOKEN` (needs write on the JinStage repo), `GIT_REMOTE`, `GIT_BRANCH=Upgrade_Testing`.
-4. Clone the JinStage branch into `workspaces/JinStage` (the triage agent reads it).
-5. `.venv/bin/python -m pytest` (17 tests, all must pass).
-
-## Running without source on the server
-```
-scripts/build.sh            # bytecode-only copy in ~/bugfix-agent-build; data dir ~/bugfix-data (.env, state, workspaces, .venv)
-cd ~/bugfix-agent-build && pm2 start .venv/bin/python --name bugfix-daemon --cwd $PWD -- -m bugfix.daemon && pm2 save
-```
-Keep the source in git only; to change the bot, clone, edit, run `scripts/build.sh`, `pm2 restart bugfix-daemon`.
-Bytecode is not protection against decompiling; it only avoids leaving plain source on disk.
-
-## Operating it
-- Progress: `pm2 logs bugfix-daemon`, `state/daemon.log`, `state/REPORT.md`, `state/results.jsonl`, sqlite `state/bugfix.db`.
-- Stop: `touch state/STOP` (remove to resume). Reboot persistence needs `pm2 startup` (sudo) or an `@reboot pm2 resurrect` cron entry.
-- Restart safe: a fix pushed but not yet verified is stored as `pending_verify` and finished on startup.
-- Changes report (changes, failures and why): `.venv/bin/python -m bugfix.changes_report` writes `reports/changes_report.pdf`.
+## Setting up the routine
+1. Create dedicated least-privilege accounts: a bot user on staging, a **read-only** user on KG (not a personal admin login), and a
+   fine-grained GitHub token for `rohanabalagalla/JinStage` only (contents, pull requests, issues: read/write; expiring).
+2. Put the variables from `.env.example` into the routine's **environment settings** on claude.ai (never in a prompt, never in git).
+3. Create the routine with this repo as its source and the prompt: "Read routine/PROMPT.md and follow it exactly."
+   Schedule: hourly at the fastest (cloud routines have a one-hour minimum interval).
+4. Revoke any credential that was ever pasted into a chat.
 
 ## Known limits
-- No local Odoo Enterprise, so fixes are checked by lint and by post-deploy re-test on staging, not by unit tests.
-- A fix can alter accounting data logic (e.g. posted journal lines); review bot commits (`autofix` in the message) regularly.
-- Bugs that need a save to reproduce can only be reproduced on staging; KG is compared by reading equivalent records and views.
-- Throughput is bounded by the Team plan's rolling usage windows.
-- Rotate any token or password that has ever been pasted into chat.
+- The cloud agent can read the environment it runs in; least-privilege credentials are the real protection.
+- No local Odoo Enterprise, so fixes are checked by static checks and by the post-merge re-test on staging.
+- Each run is time-bounded (3 rows, 2 implementations) and starts empty; the sheet and GitHub hold all state.
+- Bugs that need a save to reproduce can only be reproduced on staging.
+- Proposal branches (`autofix/*`) may trigger Odoo.sh dev builds.
+- `bugfix/changes_report.py` keeps the history of past failures (F01-F25); its live section only works if a local `state/bugfix.db` exists.

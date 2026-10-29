@@ -17,10 +17,17 @@ TARGET_HEADER = "retest status"
 PREFIX = "BOT"
 
 
-def note_for(verdict, summary="", fix=None):
-    """One-line note for the Retest Status cell."""
+def note_for(verdict, summary="", fix=None, fingerprint=None):
+    """One-line note for the Retest Status cell. The [fp:...] tag is the bot's memory: the row is skipped while it matches."""
+    note = _note_for(verdict, summary, fix)
+    return f"{note} [fp:{fingerprint}]" if fingerprint else note
+
+
+def _note_for(verdict, summary="", fix=None):
     d = time.strftime("%Y-%m-%d")
     summ = re.sub(r"\s+", " ", summary or "").strip()[:170]
+    if fix and fix.get("outcome") == "proposed":
+        return f"{PREFIX} {d}: fix PROPOSED, awaiting owner approval: {fix.get('pr_url', '')} {summ}"
     if fix and fix.get("outcome") == "fixed_verified":
         return f"{PREFIX} {d}: FIXED and verified on staging ({(fix.get('sha') or '')[:8]}). {fix.get('commit', '')[:110]}"
     if fix and fix.get("outcome") == "reverted_after_failed_verify":

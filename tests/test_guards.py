@@ -37,26 +37,9 @@ def test_path_guard():
     assert violations(["/etc/passwd"], allowed) != []
 
 
-def test_triage_parse_and_prompt():
-    from bugfix.triage import parse_verdict, build_prompt
-    from bugfix.intake.sheet_reader import Bug
-    ok = 'blah\n```json\n{"verdict": "staging_regression", "confidence": 0.8, "root_cause": "code"}\n```'
-    assert parse_verdict(ok)["needs_fix"] is True
-    data_gap = ok.replace('"code"', '"data"')
-    assert parse_verdict(data_gap)["needs_fix"] is False        # missing master data is never patched in code
-    assert parse_verdict(ok.replace(', "root_cause": "code"', ""))["needs_fix"] is False
-    assert parse_verdict('```json\n{"verdict": "verified_fixed"}\n```')["needs_fix"] is False
-    for bad in ("no block", '```json\n{"verdict": "banana"}\n```'):
-        with pytest.raises(ValueError):
-            parse_verdict(bad)
-    b = Bug("Sales", 2, {"transaction": "creating the sales order", "behaviour": "x", "status": "Correction Done", "priority": "Normal"})
-    p = build_prompt(b)
-    assert "Sales!2" in p and "STRICTLY READ-ONLY" in p and "BugFix-Sales" in p
-
-
 def test_changed_files_paths_intact(tmp_path):
     import subprocess
-    from bugfix.fix import changed_files
+    from bugfix.checks import changed_files
     r = lambda *a: subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t", *a], check=True, capture_output=True)
     r("init", "-q"); (tmp_path / "Fix-repair").mkdir(); (tmp_path / "Fix-repair/a.py").write_text("x=1\n")
     r("add", "-A"); r("commit", "-qm", "init")
@@ -66,7 +49,7 @@ def test_changed_files_paths_intact(tmp_path):
 
 def test_lint_flags_only_new_undefined_names(tmp_path):
     import subprocess
-    from bugfix.fix import lint_new_defects
+    from bugfix.checks import lint_new_defects
     r = lambda *a: subprocess.run(["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@t", *a], check=True, capture_output=True)
     r("init", "-q"); f = tmp_path / "m.py"; f.write_text("def a():\n    return old_missing\n")
     r("add", "-A"); r("commit", "-qm", "init")
@@ -86,11 +69,35 @@ def test_sheet_writer_rules():
     assert "FIXED" in note_for("x", "", {"outcome": "fixed_verified", "sha": "abcdef123456", "commit": "msg"})
 
 
-def test_no_hardcoded_install_path_and_deny_rules():
-    from pathlib import Path
-    from bugfix import triage
-    root = Path(triage.__file__).resolve().parent
-    assert "/home/odoo/bugfix-agent/" not in (root / "triage.py").read_text()
-    rules = triage.secret_deny_rules()
-    assert rules and all(r.startswith("Read(//") for r in rules)
-    assert any(r.endswith(".env)") for r in rules)
+def test_push_refuses_deploy_branch(tmp_path):
+    import pytest
+    from bugfix import git_ops
+    for b in ("Upgrade_Testing", "main", "feature/x"):
+        with pytest.raises(RuntimeError):
+            git_ops.push_branch(tmp_path, b)       # refused before any git call
+
+
+def test_note_carries_fingerprint_and_proposal():
+    from bugfix.intake.sheet_writer import note_for
+    n = note_for("staging_regression", "x", {"outcome": "proposed", "pr_url": "https://github.com/o/r/pull/1"}, "abc123")
+    assert "PROPOSED" in n and "awaiting owner approval" in n and n.endswith("[fp:abc123]")
+
+
+def test_envcfg_prefers_environment(monkeypatch):
+    from bugfix import envcfg
+    monkeypatch.setenv("STG_URL", "https://x.example")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "nope")
+    cfg = envcfg.load()
+    assert cfg["STG_URL"] == "https://x.example" and "ANTHROPIC_API_KEY" not in cfg
+
+
+def test_plan_status_only_trusts_approvers():
+    from bugfix.git_ops import plan_status
+    ok = {"owner"}
+    c = lambda u, b: {"user": u, "body": b}
+    assert plan_status([], ok) == ("awaiting", None)
+    assert plan_status([c("stranger", "approve")], ok) == ("awaiting", None)            # not the owner: ignored
+    assert plan_status([c("owner", "Approve: only touch the xml")], ok) == ("approved", "only touch the xml")
+    assert plan_status([c("owner", "approve"), c("owner", "decline")], ok)[0] == "declined"   # latest wins
+    assert plan_status([c("owner", "please also check X")], ok)[0] == "instructions"
+    assert plan_status([c("owner", "approve"), c("bot", "BOT IMPLEMENTED #3")], ok)[0] == "implemented"

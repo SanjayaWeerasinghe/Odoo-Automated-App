@@ -117,6 +117,8 @@ FAILURES = [tuple((u[0] or f[6]) if i == 6 else (f[i] + (u[1] or "") if i == 4 e
 
 
 def live_data():
+    if not (ROOT / "state" / "bugfix.db").exists():
+        return [], []
     c = sqlite3.connect(ROOT / "state" / "bugfix.db")
     tri = c.execute("SELECT key, verdict, payload, ts FROM triage ORDER BY ts").fetchall()
     try:
